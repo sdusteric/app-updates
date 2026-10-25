@@ -12,12 +12,12 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SIGN_UPDATE="$REPO_DIR/vendor/Sparkle-2.10.0/bin/sign_update"
 
 usage() {
-  echo "usage: publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>]" >&2
+  echo "usage: publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--zip <file.zip>]" >&2
   exit 2
 }
 die() { echo "publish.sh: error: $*" >&2; exit 1; }
 
-APP="" BUNDLE="" NOTES="" DRY_DIR="" PORT="8765"
+APP="" BUNDLE="" NOTES="" DRY_DIR="" PORT="8765" GIVEN_ZIP=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --app) [ $# -ge 2 ] || usage; APP="$2"; shift 2 ;;
@@ -25,6 +25,7 @@ while [ $# -gt 0 ]; do
     --notes) [ $# -ge 2 ] || usage; NOTES="$2"; shift 2 ;;
     --dry-run) [ $# -ge 2 ] || usage; DRY_DIR="$2"; shift 2 ;;
     --port) [ $# -ge 2 ] || usage; PORT="$2"; shift 2 ;;
+    --zip) [ $# -ge 2 ] || usage; GIVEN_ZIP="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -34,6 +35,7 @@ done
 [ -d "$BUNDLE" ] || die "bundle not found: $BUNDLE"
 [ -x "$SIGN_UPDATE" ] || die "sign_update not found at $SIGN_UPDATE"
 [ -z "$NOTES" ] || [ -f "$NOTES" ] || die "notes file not found: $NOTES"
+[ -z "$GIVEN_ZIP" ] || [ -f "$GIVEN_ZIP" ] || die "zip not found: $GIVEN_ZIP"
 BUNDLE="$(cd "$BUNDLE" && pwd)"
 PLIST="$BUNDLE/Contents/Info.plist"
 [ -f "$PLIST" ] || die "missing $PLIST"
@@ -90,7 +92,14 @@ else
 fi
 
 rm -f "$ZIP"
-ditto -c -k --sequesterRsrc --keepParent "$BUNDLE" "$ZIP"
+if [ -n "$GIVEN_ZIP" ]; then
+  # A zip made after notarization and stapling (tools/notarize.sh); the EdDSA signature below
+  # covers exactly this file. It must hold the bundle it was made from.
+  [ "$(unzip -Z1 "$GIVEN_ZIP" | head -n 1)" = "$(basename "$BUNDLE")/" ] || die "$GIVEN_ZIP does not start with $(basename "$BUNDLE")/"
+  cp "$GIVEN_ZIP" "$ZIP"
+else
+  ditto -c -k --sequesterRsrc --keepParent "$BUNDLE" "$ZIP"
+fi
 LENGTH="$(stat -f%z "$ZIP")"
 SIG="$("$SIGN_UPDATE" --account "$KEY_ACCOUNT" -p "$ZIP")"
 [ -n "$SIG" ] || die "sign_update returned no signature"
