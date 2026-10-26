@@ -17,16 +17,17 @@ Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap 
 
 - Each app registers its URL scheme (`haul`, `tidy`, `reel`, `snap`, `booth`) only for its installed bundle id, never for test or screenshot bundles.
 - Info.plist key `SDShelfActions`: an array of the action names the build answers. Shelf shows a quick action only when the installed build lists it, so an older build simply hides it.
-- Actions are a fixed allowlist with no parameters (Haul's existing `add?url=` is the one exception). Anything else is ignored. Every action is safe to trigger by accident: it opens a window, starts a selection or starts a read-only scan, and nothing deletes, uploads or records without a further confirmation in the app.
+- Actions are a fixed allowlist with no parameters, with two exceptions: Haul's existing `add?url=`, and `open-item?id=<id>` with optional `&t=<seconds>` (a decimal, 0 or more) for a Recall search result. For `open-item` the app checks that `id` matches `[A-Za-z0-9-]{1,64}`, ignores unknown parameters, and opens its library or history plainly when the id is unknown. Anything else is ignored. Every action is safe to trigger by accident: it opens a window, starts a selection or starts a read-only scan, and nothing deletes, uploads or records without a further confirmation in the app.
 - Every app also answers and lists `check-for-updates` (it shows its own Sparkle check). Shelf uses it as the update fallback and never shows it as a quick action.
+- An app with Recall entries (Snap, Booth) lists `open-item`. Shelf never shows it as a quick action; without it, a search result opens the app plainly.
 
 | App | `SDShelfActions` |
 |---|---|
 | Haul | `paste`, `check-for-updates` |
 | Tidy | `checkup`, `check-for-updates` |
 | Reel | `open-recent`, `check-for-updates` |
-| Snap | `capture-area`, `capture-window`, `check-for-updates` |
-| Booth | `new-episode`, `check-for-updates` |
+| Snap | `capture-area`, `capture-window`, `open-item`, `check-for-updates` |
+| Booth | `new-episode`, `open-item`, `check-for-updates` |
 
 ### Live status
 
@@ -48,3 +49,17 @@ Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap 
 - Never included: file paths, URLs (page, download or feed), clipboard contents, file names, hashes or IDs of user content, account names, tokens. Titles only where the user already sees them in the app (Reel's video title, Booth's episode title), cut to 80 characters.
 - How Shelf reads: one file-system watcher on the `status` folder, no timers and no polling. It waits 300 ms after an event, then re-reads only files whose modification time changed. While the panel is closed it only marks the data stale; while it is open a change reaches the view at most once a second.
 - Fallback: Shelf shows its static info and no live line, with no error text, when the file is missing, is not valid JSON, is over 16 KB, has an unknown schema or another app's name, is past its `expires_at`, or belongs to an app that is not installed. Values that only make sense while the app runs (Haul's queue) are dropped when the app is not running. At-rest values (Tidy's size, Booth's episode state) stay visible for up to 30 days, with their age in words.
+
+### Search index (Recall)
+
+Snap and Booth (phase 1) write what they extract from the owner's captures so Shelf can search it. Shelf only reads.
+
+- Folder: `~/Library/Application Support/Shelf/recall/<scheme>/`, created by the app if missing, mode 0700. With a non-default `<APP>_HOME` the app uses its own folder next to its test status folder (Snap `ShelfRecall/`, Booth `shelf-recall/`).
+- One file per item, `<id>.json`, mode 0600, at most 4 MB. `id` is the app's own id, `[A-Za-z0-9-]{1,64}`, and matches the file name. Write as status files are written: `.<name>.tmp` in the same folder, `fsync`, `rename(2)`.
+- Fields: `schema` (1), `app` (the scheme), `id`, `kind` (`screenshot`, `take`), `title` (at most 120 characters), `created_at`, `updated_at` (UTC ISO 8601), optional `language` (BCP 47), optional `preview` (a file name in the same folder), optional `duration_seconds`, optional `context` (an object of display strings and numbers, at most 120 characters each), `segments` (an array of `{text}` with optional `start` and `end` in seconds and `speaker` (`host`, `guest`)).
+- Preview: optional `<id>.jpg`, 480 px on the long side at most, 80 KB at most. Snap writes one only while its "Show previews in Shelf search" setting is on. Booth writes the episode artwork.
+- The status file "Never included" list does not apply here. Entries carry ids, titles and extracted text by design; this section's own list below governs them.
+- The app keeps the folder exact: it writes an entry when an item is captured or transcribed, rewrites it when the item changes, and deletes the entry and preview in the same step that removes the item (retention, Trash, discard, delete). At launch it reconciles the folder with its own data. Turning the app's search setting off deletes everything it wrote there.
+- Never included: text the app identified as a likely secret (replaced with `[hidden]`), anything from an item the owner excluded, audio, full-size images, file paths, URLs, account names, tokens.
+- Shelf reads with one watcher per app folder, a 300 ms debounce and modification-time checks, and keeps its own index in `$SHELF_HOME/recall.sqlite`, which it may delete and rebuild at any time. Shelf skips a file that is over 4 MB, not valid JSON, of an unknown schema, of another app, a symlink, or whose id does not match its name. It resolves `preview` inside that app's folder only and refuses `/` and `..`. Shelf never writes, creates or deletes anything under `recall/`.
+- Status fields: Snap and Booth add optional `recall` (`on`, `off`, and for Booth `needs_model`) and `recall_pending` (an integer) to their status files.
