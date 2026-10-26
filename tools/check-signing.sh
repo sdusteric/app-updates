@@ -39,7 +39,8 @@ fail() { printf 'FAIL  %-12s %s\n' "$1" "$2"; FAILED=1; }
 # Every Mach-O in the bundle (regular files only, so framework symlinks count once).
 MACHOS=()
 while IFS= read -r -d '' f; do
-  if file -b "$f" | grep -q 'Mach-O'; then MACHOS+=("$f"); fi
+  # Captured first: under pipefail, grep -q closing the pipe early fails the writer with SIGPIPE.
+  kind=$(file -b "$f"); if [[ $kind == *Mach-O* ]]; then MACHOS+=("$f"); fi
 done < <(find "$APP" -type f -print0)
 
 # hardened
@@ -72,7 +73,7 @@ fi
 # usage
 bad=""
 for pair in "com.apple.security.device.audio-input:NSMicrophoneUsageDescription" "com.apple.security.device.camera:NSCameraUsageDescription"; do
-  if printf '%s' "$have" | grep -q "\"${pair%%:*}\": true"; then
+  if grep -q "\"${pair%%:*}\": true" <<<"$have"; then
     v=$(/usr/libexec/PlistBuddy -c "Print :${pair#*:}" "$APP/Contents/Info.plist" 2>/dev/null || true)
     [ -n "$v" ] || bad="$bad [${pair%%:*} without ${pair#*:}]"
   fi
@@ -97,7 +98,8 @@ fi
 auth=$(codesign -dvv "$APP" 2>&1 | sed -n 's/^Authority=//p' | head -n 1)
 case "$auth" in
   "Developer ID Application:"*)
-    if codesign -dvv "$APP" 2>&1 | grep -q '^Timestamp='; then
+    sig=$(codesign -dvv "$APP" 2>&1)
+    if grep -q '^Timestamp=' <<<"$sig"; then
       pass timestamp "Developer ID with a secure timestamp"
     else
       fail timestamp "Developer ID signature without a secure timestamp"
