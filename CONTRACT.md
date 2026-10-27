@@ -11,14 +11,15 @@
 
 ## Shelf (home base for the apps)
 
-Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap and Booth. Haul is private and has no feed: Shelf shows its local version only and never requests a Haul feed.
+Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap, Booth and Dolly. Haul is private and has no feed: Shelf shows its local version only and never requests a Haul feed.
 
 ### Actions: `SDShelfActions`
 
-- Each app registers its URL scheme (`haul`, `tidy`, `reel`, `snap`, `booth`) only for its installed bundle id, never for test or screenshot bundles.
+- Each app registers its URL scheme (`haul`, `tidy`, `reel`, `snap`, `booth`, `dolly`) only for its installed bundle id, never for test or screenshot bundles.
 - Info.plist key `SDShelfActions`: an array of the action names the build answers. Shelf shows a quick action only when the installed build lists it, so an older build simply hides it.
 - Actions are a fixed allowlist with no parameters, with two exceptions: Haul's existing `add?url=`, and `open-item?id=<id>` with optional `&t=<seconds>` (a decimal, 0 or more) for a Recall search result. For `open-item` the app checks that `id` matches `[A-Za-z0-9-]{1,64}`, ignores unknown parameters, and opens its library or history plainly when the id is unknown. Anything else is ignored. Every action is safe to trigger by accident: it opens a window, starts a selection or starts a read-only scan, and nothing deletes, uploads or records without a further confirmation in the app.
 - Every app also answers and lists `check-for-updates` (it shows its own Sparkle check). Shelf uses it as the update fallback and never shows it as a quick action.
+- Dolly's `record` opens its Record bar; recording starts only from the bar's Record button. During a recording it stops and saves the take, as Dolly's own shortcut does.
 - An app with Recall entries (Snap, Booth) lists `open-item`. Shelf never shows it as a quick action; without it, a search result opens the app plainly.
 
 | App | `SDShelfActions` |
@@ -28,12 +29,13 @@ Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap 
 | Reel | `open-recent`, `check-for-updates` |
 | Snap | `capture-area`, `capture-window`, `open-item`, `check-for-updates` |
 | Booth | `new-episode`, `open-item`, `check-for-updates` |
+| Dolly | `record`, `open-latest`, `check-for-updates` |
 
 ### Live status
 
 - File: each app writes one JSON file, `~/Library/Application Support/Shelf/status/<scheme>.json`. The app creates the folder if it is missing. Mode 0600, 16 KB at most. Shelf only reads these files and never writes or deletes them.
 - Common fields: `schema` (1), `app` (the scheme), `app_version`, `updated_at`. Optional `expires_at`: after that time Shelf treats the file as stale. Unknown fields are ignored. A `schema` higher than Shelf knows is treated as a missing file.
-- Every timestamp (`updated_at`, `expires_at`, `last_check_at`, `taken_at`) is a UTC ISO 8601 string such as `2026-10-23T14:02:11Z`. Byte counts are JSON integers.
+- Every timestamp (`updated_at`, `expires_at`, `last_check_at`, `taken_at`, `exported_at`) is a UTC ISO 8601 string such as `2026-10-23T14:02:11Z`. Byte counts are JSON integers.
 - Every app-specific field is optional. Shelf drops a field with the wrong type on its own and keeps the rest of the file.
 
 | App | Fields | Written when |
@@ -43,10 +45,11 @@ Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap 
 | Reel | `resume_title`, `remaining_seconds`, `position_fraction`, optional `poster` | When playback pauses, stops or the app quits, and on resume. |
 | Snap | `captures`: up to 3 of `{taken_at, preview}` | After each capture. |
 | Booth | `episode_number`, `episode_title`, `script`, `recording`, `editing` (each `done` or `pending`) | When a stage changes. A field Booth has no source for is left out; `editing` is `done` only after export. |
+| Dolly | `latest`: `{title, length_seconds, exported_shapes, exported_at}` for the most recently exported take (`exported_shapes` such as `["16:9"]`, `length_seconds` a decimal), optional `poster` | At launch and after each export. `latest` is left out until a take has been exported. |
 
-- Previews: small JPEG files in `status/<scheme>/`, 240 px wide at most and 30 KB each: `poster.jpg` for Reel, `1.jpg` to `3.jpg` for Snap. Reel's `poster` is the relative path `reel/poster.jpg`, present only while the file exists. Each Snap capture's `preview` is the file name inside `status/snap/` (`1.jpg`), present only when previews are on. Shelf resolves preview paths against the status folder only and refuses any path with `..` or a leading `/`. An app writes previews only when its own "Show in Shelf" setting is on (default off) and deletes them when it is turned off.
+- Previews: small JPEG files in `status/<scheme>/`, 240 px wide at most and 30 KB each: `poster.jpg` for Reel and Dolly, `1.jpg` to `3.jpg` for Snap. Reel's `poster` is the relative path `reel/poster.jpg` and Dolly's `dolly/poster.jpg`, each present only while the file exists. Each Snap capture's `preview` is the file name inside `status/snap/` (`1.jpg`), present only when previews are on. Shelf resolves preview paths against the status folder only and refuses any path with `..` or a leading `/`. An app writes previews only when its own "Show in Shelf" setting is on (default off) and deletes them when it is turned off.
 - Writing: write `.<name>.tmp` in the same folder, `fsync`, then `rename(2)` over the target. Never write in place. At most one write per second per app.
-- Never included: file paths, URLs (page, download or feed), clipboard contents, file names, hashes or IDs of user content, account names, tokens. Titles only where the user already sees them in the app (Reel's video title, Booth's episode title), cut to 80 characters.
+- Never included: file paths, URLs (page, download or feed), clipboard contents, file names, hashes or IDs of user content, account names, tokens. Titles only where the user already sees them in the app (Reel's video title, Booth's episode title, Dolly's take name), cut to 80 characters.
 - How Shelf reads: one file-system watcher on the `status` folder, no timers and no polling. It waits 300 ms after an event, then re-reads only files whose modification time changed. While the panel is closed it only marks the data stale; while it is open a change reaches the view at most once a second.
 - Fallback: Shelf shows its static info and no live line, with no error text, when the file is missing, is not valid JSON, is over 16 KB, has an unknown schema or another app's name, is past its `expires_at`, or belongs to an app that is not installed. Values that only make sense while the app runs (Haul's queue) are dropped when the app is not running. At-rest values (Tidy's size, Booth's episode state) stay visible for up to 30 days, with their age in words.
 
