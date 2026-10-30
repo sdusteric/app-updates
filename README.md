@@ -15,7 +15,7 @@ https://sdusteric.github.io/app-updates/<app>/appcast.xml
 From an app repo, `scripts/release.sh` runs the checks, builds the release bundle and calls:
 
 ```
-tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>]
+tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--channel beta]
 ```
 
 What it does:

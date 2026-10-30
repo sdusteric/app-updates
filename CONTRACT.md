@@ -7,7 +7,8 @@
 - Versions: `CFBundleShortVersionString` from the repo's VERSION file (semver). `CFBundleVersion` is the UTC build time `YYYYMMDDHHMM`, always increasing.
 - Info.plist keys: `SUFeedURL`, `SUPublicEDKey`, `SUEnableAutomaticChecks` true, `SUAutomaticallyUpdate` true, `SUScheduledCheckInterval` 86400.
 - In app: a "Check for Updates…" menu item and a settings toggle for automatic updates. The updater never starts in shot mode, tests, CLIs or when the env var `<APP>_NO_UPDATES=1` is set.
-- Publishing: `tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>]`. Each app repo has `scripts/release.sh` that runs its check gates, builds the release bundle and calls publish.sh.
+- Publishing: `tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--channel beta]`. Each app repo has `scripts/release.sh` that runs its check gates, builds the release bundle and calls publish.sh.
+- Beta channel: `--channel beta` marks the new item `<sparkle:channel>beta</sparkle:channel>`. Sparkle offers it only to apps whose updater delegate returns `beta` from `allowedChannels(for:)` (a "Get beta updates" setting, off by default); everyone else skips it and keeps getting the newest item without a channel. One feed per app either way.
 
 ## Shelf (home base for the apps)
 

@@ -75,4 +75,14 @@ ok "wrong SUPublicEDKey refused"
 
 [ "$(grep -c '<item>' "$OUT/appcast.xml")" = 2 ] || fail "refused runs changed the appcast"
 ok "refused runs left the appcast unchanged"
+
+B5="$T/b5"; mkdir "$B5"; make_bundle "$B5" 1.1.0 202601040404 "$GOOD_KEY"
+"$ROOT/tools/publish.sh" --app dummy --bundle "$B5/Dummy.app" --channel beta --dry-run "$OUT" >/dev/null
+first_item="$(awk '/<item>/{n++} n==1' "$OUT/appcast.xml")"
+echo "$first_item" | grep -q '<sparkle:channel>beta</sparkle:channel>' || fail "beta item has no channel"
+[ "$(grep -c '<sparkle:channel>' "$OUT/appcast.xml")" = 1 ] || fail "older items gained a channel"
+if "$ROOT/tools/publish.sh" --app dummy --bundle "$B5/Dummy.app" --channel 'Beta 1' --dry-run "$OUT" >/dev/null 2>&1; then
+  fail "bad channel name was accepted"
+fi
+ok "--channel beta marks only the new item"
 echo "all $PASS checks passed"

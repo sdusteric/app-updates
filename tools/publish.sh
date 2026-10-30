@@ -12,12 +12,12 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SIGN_UPDATE="$REPO_DIR/vendor/Sparkle-2.10.0/bin/sign_update"
 
 usage() {
-  echo "usage: publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--zip <file.zip>]" >&2
+  echo "usage: publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--zip <file.zip>] [--channel <name>]" >&2
   exit 2
 }
 die() { echo "publish.sh: error: $*" >&2; exit 1; }
 
-APP="" BUNDLE="" NOTES="" DRY_DIR="" PORT="8765" GIVEN_ZIP=""
+APP="" BUNDLE="" NOTES="" DRY_DIR="" PORT="8765" GIVEN_ZIP="" CHANNEL=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --app) [ $# -ge 2 ] || usage; APP="$2"; shift 2 ;;
@@ -26,12 +26,15 @@ while [ $# -gt 0 ]; do
     --dry-run) [ $# -ge 2 ] || usage; DRY_DIR="$2"; shift 2 ;;
     --port) [ $# -ge 2 ] || usage; PORT="$2"; shift 2 ;;
     --zip) [ $# -ge 2 ] || usage; GIVEN_ZIP="$2"; shift 2 ;;
+    --channel) [ $# -ge 2 ] || usage; CHANNEL="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
 [ -n "$APP" ] && [ -n "$BUNDLE" ] || usage
 [[ "$APP" =~ ^[a-z][a-z0-9-]*$ ]] || die "--app must be lowercase letters, digits and dashes"
 [[ "$PORT" =~ ^[0-9]+$ ]] || die "--port must be a number"
+# Sparkle offers an item with <sparkle:channel> only to apps that allow that channel; with none, everyone gets it.
+[ -z "$CHANNEL" ] || [[ "$CHANNEL" =~ ^[a-z]+$ ]] || die "--channel must be lowercase letters"
 [ -d "$BUNDLE" ] || die "bundle not found: $BUNDLE"
 [ -x "$SIGN_UPDATE" ] || die "sign_update not found at $SIGN_UPDATE"
 [ -z "$NOTES" ] || [ -f "$NOTES" ] || die "notes file not found: $NOTES"
@@ -107,9 +110,9 @@ PUBDATE="$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"
 
 # Write or update the appcast.
 FEED_URL="$PAGES_BASE/$APP/appcast.xml"
-python3 -I - "$APPCAST" "$NOTES" "$APP" "$FEED_URL" "$SHORT" "$BUILD" "$MIN_OS" "$URL" "$LENGTH" "$SIG" "$PUBDATE" <<'PY'
+python3 -I - "$APPCAST" "$NOTES" "$APP" "$FEED_URL" "$SHORT" "$BUILD" "$MIN_OS" "$URL" "$LENGTH" "$SIG" "$PUBDATE" "$CHANNEL" <<'PY'
 import html, os, re, sys, tempfile
-appcast, notes, app, feed, short, build, minos, url, length, sig, pubdate = sys.argv[1:12]
+appcast, notes, app, feed, short, build, minos, url, length, sig, pubdate, channel = sys.argv[1:13]
 
 def inline(s):
     s = html.escape(s, quote=False)
@@ -166,9 +169,11 @@ item = (
     '      <sparkle:shortVersionString>%s</sparkle:shortVersionString>\n'
     '      <sparkle:minimumSystemVersion>%s</sparkle:minimumSystemVersion>\n'
     '%s'
+    '%s'
     '      <enclosure url="%s" length="%s" type="application/octet-stream" sparkle:edSignature="%s"/>\n'
     '    </item>\n'
-) % (esc(short), pubdate, esc(build), esc(short), esc(minos), desc, esc(url), esc(length), esc(sig))
+) % (esc(short), pubdate, esc(build), esc(short), esc(minos),
+       ('      <sparkle:channel>%s</sparkle:channel>\n' % esc(channel)) if channel else '', desc, esc(url), esc(length), esc(sig))
 
 old_items = []
 if os.path.exists(appcast):
