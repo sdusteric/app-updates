@@ -77,9 +77,10 @@ if [ -f "$APPCAST" ]; then
   fi
 fi
 
-NAME="$(basename "$BUNDLE" .app)"
-NAME="${NAME// /-}"
+DISPLAY_NAME="$(basename "$BUNDLE" .app)"
+NAME="${DISPLAY_NAME// /-}"
 ZIP_NAME="$NAME-$SHORT-$BUILD.zip"
+DMG_NAME="$NAME-$SHORT-$BUILD.dmg"
 TAG="$APP-v$SHORT-$BUILD"
 
 WORK="$(mktemp -d)"
@@ -89,9 +90,13 @@ trap cleanup EXIT
 if [ -n "$DRY_DIR" ]; then
   ZIP="$OUT_DIR/$ZIP_NAME"
   URL="http://127.0.0.1:$PORT/$ZIP_NAME"
+  DMG="$OUT_DIR/$DMG_NAME"
+  DMG_URL="http://127.0.0.1:$PORT/$DMG_NAME"
 else
   ZIP="$WORK/$ZIP_NAME"
   URL="https://github.com/$REPO_SLUG/releases/download/$TAG/$ZIP_NAME"
+  DMG="$WORK/$DMG_NAME"
+  DMG_URL="https://github.com/$REPO_SLUG/releases/download/$TAG/$DMG_NAME"
 fi
 
 rm -f "$ZIP"
@@ -107,6 +112,56 @@ LENGTH="$(stat -f%z "$ZIP")"
 SIG="$("$SIGN_UPDATE" --account "$KEY_ACCOUNT" -p "$ZIP")"
 [ -n "$SIG" ] || die "sign_update returned no signature"
 PUBDATE="$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')"
+
+# The disk image for first installs, made before the appcast changes so a failed notarization
+# publishes nothing. A real publish uploads it only when it is notarized; a dry run keeps it to inspect.
+HAVE_DMG=0
+DMG_ARGS=(--bundle "$BUNDLE" --out "$DMG")
+[ -z "$DRY_DIR" ] || DMG_ARGS+=(--dry-run)
+DMG_RC=0
+"$SCRIPT_DIR/make-dmg.sh" "${DMG_ARGS[@]}" || DMG_RC=$?
+case "$DMG_RC" in
+  0) HAVE_DMG=1 ;;
+  10) if [ -n "$DRY_DIR" ]; then HAVE_DMG=1; else echo "publish.sh: no disk image for this release (not notarized)"; fi ;;
+  *) die "make-dmg.sh failed (exit $DMG_RC)" ;;
+esac
+
+# <app>/download/ sends people to the newest disk image, so one link stays good across releases.
+# Beta releases leave it alone.
+DOWNLOAD_PAGE=""
+if [ "$HAVE_DMG" = 1 ] && [ -z "$CHANNEL" ]; then
+  DOWNLOAD_PAGE="$OUT_DIR/download/index.html"
+  mkdir -p "$OUT_DIR/download"
+  python3 -I - "$DOWNLOAD_PAGE" "$DISPLAY_NAME" "$SHORT" "$DMG_URL" <<'PY'
+import html, os, sys, tempfile
+page, name, short, url = sys.argv[1:5]
+n, s, u = (html.escape(x, quote=True) for x in (name, short, url))
+doc = f'''<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="0; url={u}">
+<title>Download {n}</title>
+<style>
+:root {{ color-scheme: light dark; }}
+body {{ font: 17px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 34rem; margin: 18vh auto; padding: 0 1.5rem; color: #1d1d1f; background: #fff; }}
+a {{ color: #0066cc; }}
+@media (prefers-color-scheme: dark) {{ body {{ color: #f5f5f7; background: #1d1d1f; }} a {{ color: #4da3ff; }} }}
+</style>
+</head>
+<body>
+<p>Downloading {n} {s}. If nothing happens, <a href="{u}">download it here</a>.</p>
+<p>Open the disk image and drag {n} to Applications.</p>
+</body>
+</html>
+'''
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(page), prefix='.download.')
+with os.fdopen(fd, 'w', encoding='utf-8') as f:
+    f.write(doc)
+os.replace(tmp, page)
+PY
+fi
 
 # Write or update the appcast.
 FEED_URL="$PAGES_BASE/$APP/appcast.xml"
@@ -205,14 +260,18 @@ PY
 xmllint --noout "$APPCAST" || die "generated appcast is not well-formed"
 
 if [ -n "$DRY_DIR" ]; then
-  echo "dry-run: $APP $SHORT ($BUILD) zip=$ZIP appcast=$APPCAST url=$URL length=$LENGTH"
+  echo "dry-run: $APP $SHORT ($BUILD) zip=$ZIP appcast=$APPCAST url=$URL length=$LENGTH dmg=$([ "$HAVE_DMG" = 1 ] && echo "$DMG" || echo none) download=${DOWNLOAD_PAGE:-unchanged}"
   exit 0
 fi
 
 # Real mode.
 command -v gh >/dev/null || die "gh is required"
-gh release create "$TAG" "$ZIP" --repo "$REPO_SLUG" --title "$APP $SHORT ($BUILD)" --notes "${APP} ${SHORT} (build ${BUILD})"
-git -C "$REPO_DIR" add "$APP/appcast.xml"
-git -C "$REPO_DIR" commit -m "$APP $SHORT ($BUILD)" -- "$APP/appcast.xml"
+ASSETS=("$ZIP")
+[ "$HAVE_DMG" = 0 ] || ASSETS+=("$DMG")
+gh release create "$TAG" "${ASSETS[@]}" --repo "$REPO_SLUG" --title "$APP $SHORT ($BUILD)" --notes "${APP} ${SHORT} (build ${BUILD})"
+PATHS=("$APP/appcast.xml")
+[ -z "$DOWNLOAD_PAGE" ] || PATHS+=("$APP/download/index.html")
+git -C "$REPO_DIR" add "${PATHS[@]}"
+git -C "$REPO_DIR" commit -m "$APP $SHORT ($BUILD)" -- "${PATHS[@]}"
 git -C "$REPO_DIR" push origin main
-echo "published: $APP $SHORT ($BUILD) release=$TAG feed=$FEED_URL length=$LENGTH"
+echo "published: $APP $SHORT ($BUILD) release=$TAG feed=$FEED_URL length=$LENGTH${DOWNLOAD_PAGE:+ download=$PAGES_BASE/$APP/download/}"

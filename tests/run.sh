@@ -52,6 +52,27 @@ grep -q 'http://127.0.0.1:8765/Dummy-1.0.1-202601020202.zip' "$OUT/appcast.xml" 
 grep -q '<li><strong>Fast</strong> fix for <code>x</code> &amp; &lt;y&gt;</li>' "$OUT/appcast.xml" || fail "notes html"
 ok "appcast has newest first, local urls, rendered notes"
 
+DMG="$OUT/Dummy-1.0.1-202601020202.dmg"
+[ -f "$DMG" ] || fail "no disk image"
+hdiutil verify -quiet "$DMG" || fail "disk image does not verify"
+MNT="$T/mnt"; mkdir "$MNT"
+hdiutil attach -quiet -nobrowse -noautoopen -readonly -mountpoint "$MNT" "$DMG" || fail "disk image does not attach"
+[ -x "$MNT/Dummy.app/Contents/MacOS/Dummy" ] && [ "$(readlink "$MNT/Applications")" = /Applications ]
+in_image=$?
+codesign --verify --deep --strict "$MNT/Dummy.app" 2>/dev/null
+signed=$?
+hdiutil detach -quiet "$MNT" || fail "disk image does not detach"
+[ "$in_image" = 0 ] || fail "disk image lacks Dummy.app or the Applications link"
+[ "$signed" = 0 ] || fail "app in the disk image fails codesign --verify"
+ok "disk image holds the signed app and an Applications link"
+
+PAGE="$OUT/download/index.html"
+[ -f "$PAGE" ] || fail "no download page"
+grep -q 'content="0; url=http://127.0.0.1:8765/Dummy-1.0.1-202601020202.dmg"' "$PAGE" || fail "download page does not point at the newest disk image"
+grep -q 'Downloading Dummy 1.0.1' "$PAGE" || fail "download page names the wrong version"
+xmllint --html --noout "$PAGE" 2>/dev/null || fail "download page does not parse"
+ok "download page points at the newest disk image"
+
 "$ROOT/tools/verify-appcast.sh" "$OUT/appcast.xml" "$OUT/Dummy-1.0.1-202601020202.zip"
 ok "verify-appcast accepts newest zip"
 
@@ -85,4 +106,7 @@ if "$ROOT/tools/publish.sh" --app dummy --bundle "$B5/Dummy.app" --channel 'Beta
   fail "bad channel name was accepted"
 fi
 ok "--channel beta marks only the new item"
+grep -q 'Dummy-1.0.1-202601020202.dmg' "$OUT/download/index.html" || fail "a beta release moved the download page"
+[ -f "$OUT/Dummy-1.1.0-202601040404.dmg" ] || fail "beta release has no disk image"
+ok "beta release gets a disk image but leaves the download page"
 echo "all $PASS checks passed"
