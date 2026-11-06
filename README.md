@@ -15,7 +15,7 @@ https://sdusteric.github.io/app-updates/<app>/appcast.xml
 From an app repo, `scripts/release.sh` runs the checks, builds the release bundle and calls:
 
 ```
-tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--channel beta]
+tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--channel beta] [--prefix <name>]
 ```
 
 What it does:
@@ -25,9 +25,11 @@ What it does:
 3. Makes the disk image for first installs with `tools/make-dmg.sh`: the app plus an Applications link, signed with the app's Developer ID certificate, notarized and stapled. This is a second notary submission, a few minutes more. A bundle not signed with Developer ID gets no disk image. Unless the release is `--channel beta`, it also writes `<app>/download/index.html`, which sends people to the newest disk image.
 4. Creates the GitHub release `<app>-v<short>-<build>`, uploads the zip and the disk image, commits the appcast and the download page and pushes `main`.
 
+Apps on R2 (the table at the top of `publish.sh`; today only `kalos`, bucket `kalos-updates`) skip step 4 and the download page. Instead publish.sh fetches the current appcast from the bucket with `pnpm dlx wrangler r2 object get ... --remote` (a missing one means a first release; any other error stops the publish), then uploads the zip, the disk image and the appcast last with `wrangler r2 object put ... --remote`. Enclosure URLs start with `KALOS_UPDATES_BASE` (default `https://updates.kalosbrowser.com`). `--prefix <name>` publishes to `<bucket>/<name>/` instead of `<bucket>/<app>/`, for an end-to-end test that leaves the real feed alone. It needs `pnpm dlx wrangler login` once.
+
 `--notes` takes a markdown file (headings, bullets, paragraphs, bold, italic, code) and renders it as simple HTML in the item description.
 
-Dry run: `--dry-run <dir>` writes the zip, the disk image (not signed or notarized), `download/index.html` and `appcast.xml` into `<dir>` with URLs of the form `http://127.0.0.1:<port>/<zip>` (default port 8765). It does nothing on the network and does not touch this repo. Serve the directory with a local HTTP server to test an app's updater against it.
+Dry run: `--dry-run <dir>` writes the zip, the disk image (not signed or notarized), `download/index.html` and `appcast.xml` into `<dir>` with URLs of the form `http://127.0.0.1:<port>/<zip>` (default port 8765); an R2 app keeps its real R2 addresses and gets no download page. It does nothing on the network and does not touch this repo. Serve the directory with a local HTTP server to test an app's updater against it.
 
 Check a result with:
 
@@ -37,7 +39,7 @@ tools/verify-appcast.sh <appcast.xml> <zip>
 
 It checks that the XML parses, that the newest item's length matches the zip, and that `sign_update --verify` accepts the signature. It also confirms that the Keychain key matches the public key in `CONTRACT.md`.
 
-Run the offline test with `tests/run.sh`. It builds a dummy app and only uses dry-run mode.
+Run the offline test with `tests/run.sh`. It builds a dummy app and uses dry-run mode, plus R2 publishes against a fake `wrangler` that keeps the bucket in a temp folder.
 
 ## Signing key backup
 

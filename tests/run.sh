@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline test for publish.sh and verify-appcast.sh. Uses dry-run mode only.
+# Offline test for publish.sh and verify-appcast.sh: dry runs, and R2 publishes against a fake wrangler.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -109,4 +109,68 @@ ok "--channel beta marks only the new item"
 grep -q 'Dummy-1.0.1-202601020202.dmg' "$OUT/download/index.html" || fail "a beta release moved the download page"
 [ -f "$OUT/Dummy-1.1.0-202601040404.dmg" ] || fail "beta release has no disk image"
 ok "beta release gets a disk image but leaves the download page"
+# R2 apps (kalos): dry runs keep the real addresses and make no download page.
+R2OUT="$T/r2out"; mkdir "$R2OUT"
+"$ROOT/tools/publish.sh" --app kalos --bundle "$B1/Dummy.app" --dry-run "$R2OUT" >/dev/null
+grep -q 'url="https://updates.kalosbrowser.com/kalos/Dummy-1.0.0-202601010101.zip"' "$R2OUT/appcast.xml" || fail "R2 enclosure url"
+grep -q '<link>https://updates.kalosbrowser.com/kalos/appcast.xml</link>' "$R2OUT/appcast.xml" || fail "R2 feed link"
+[ ! -e "$R2OUT/download" ] || fail "an R2 app got a download page"
+[ -f "$R2OUT/Dummy-1.0.0-202601010101.dmg" ] || fail "R2 dry run has no disk image"
+R2T="$T/r2test"; mkdir "$R2T"
+KALOS_UPDATES_BASE="https://pub-x.r2.dev/" "$ROOT/tools/publish.sh" --app kalos --prefix kalos-test --bundle "$B1/Dummy.app" --dry-run "$R2T" >/dev/null
+grep -q 'url="https://pub-x.r2.dev/kalos-test/Dummy-1.0.0-202601010101.zip"' "$R2T/appcast.xml" || fail "KALOS_UPDATES_BASE and --prefix"
+ok "R2 dry run uses the R2 base and prefix and makes no download page"
+for bad in "--app dummy --prefix x" "--app kalos --prefix Bad_Name"; do
+  # shellcheck disable=SC2086
+  if "$ROOT/tools/publish.sh" $bad --bundle "$B1/Dummy.app" --dry-run "$T/r2test" >/dev/null 2>&1; then fail "accepted: $bad"; fi
+done
+if KALOS_UPDATES_BASE="http://x.example" "$ROOT/tools/publish.sh" --app kalos --bundle "$B1/Dummy.app" --dry-run "$T/r2test" >/dev/null 2>&1; then
+  fail "accepted a plain http R2 base"
+fi
+ok "--prefix only for R2 apps, checked names and an https base"
+
+# A real R2 publish against a fake wrangler that keeps the bucket in a folder. A fake gh fails,
+# so a mistake here can never make a GitHub release.
+FAKE="$T/fake"; STORE="$T/bucket"; LOG="$T/wrangler.log"; mkdir -p "$FAKE" "$STORE"
+cat > "$FAKE/wrangler" <<'SH'
+#!/bin/bash
+echo "$*" >> "$FAKE_LOG"
+[ "$1 $2" = "r2 object" ] || exit 9
+verb="$3" key="$4"; shift 4
+file="" remote=0
+while [ $# -gt 0 ]; do case "$1" in --file) file="$2"; shift 2 ;; --remote) remote=1; shift ;; *) shift 2 ;; esac; done
+[ "$remote" = 1 ] || { echo "not --remote" >&2; exit 8; }
+case "$verb" in
+  get)
+    [ -z "${FAKE_GET_ERROR:-}" ] || { echo "Authentication error [code: 10000]" >&2; : > "$file"; exit 1; }
+    : > "$file"
+    [ -f "$FAKE_STORE/$key" ] || { echo "✘ [ERROR] The specified key does not exist." >&2; exit 1; }
+    cp "$FAKE_STORE/$key" "$file" ;;
+  put) mkdir -p "$(dirname "$FAKE_STORE/$key")"; cp "$file" "$FAKE_STORE/$key" ;;
+  *) exit 7 ;;
+esac
+SH
+printf '#!/bin/sh\necho "fake gh: $*" >&2\nexit 1\n' > "$FAKE/gh"
+chmod +x "$FAKE/wrangler" "$FAKE/gh"
+r2pub() { PATH="$FAKE:$PATH" FAKE_LOG="$LOG" FAKE_STORE="$STORE" PUBLISH_WRANGLER="$FAKE/wrangler" "$ROOT/tools/publish.sh" --app kalos "$@"; }
+
+r2pub --bundle "$B1/Dummy.app" >/dev/null
+[ -f "$STORE/kalos-updates/kalos/Dummy-1.0.0-202601010101.zip" ] || fail "R2 publish did not upload the zip"
+[ "$(grep -c '<item>' "$STORE/kalos-updates/kalos/appcast.xml")" = 1 ] || fail "first R2 appcast"
+puts="$(grep '^r2 object put' "$LOG" | awk '{print $4}' | tr '\n' ' ')"
+[ "$puts" = "kalos-updates/kalos/Dummy-1.0.0-202601010101.zip kalos-updates/kalos/appcast.xml " ] || fail "upload order: $puts"
+grep -q 'appcast.xml .*--cache-control no-cache' "$LOG" || fail "appcast is not no-cache"
+ok "first R2 publish uploads the zip, then the appcast"
+
+r2pub --bundle "$B2/Dummy.app" >/dev/null
+[ "$(grep -c '<item>' "$STORE/kalos-updates/kalos/appcast.xml")" = 2 ] || fail "second R2 publish dropped the first item"
+"$ROOT/tools/verify-appcast.sh" "$STORE/kalos-updates/kalos/appcast.xml" "$STORE/kalos-updates/kalos/Dummy-1.0.1-202601020202.zip" >/dev/null
+if r2pub --bundle "$B3/Dummy.app" >/dev/null 2>&1; then fail "R2 accepted a lower build than the bucket's appcast"; fi
+before="$(cat "$STORE/kalos-updates/kalos/appcast.xml")"
+if FAKE_GET_ERROR=1 r2pub --bundle "$B5/Dummy.app" >/dev/null 2>&1; then fail "R2 publish went on after a failed appcast fetch"; fi
+[ "$before" = "$(cat "$STORE/kalos-updates/kalos/appcast.xml")" ] || fail "a failed fetch changed the appcast"
+[ ! -e "$STORE/kalos-updates/kalos/Dummy-1.1.0-202601040404.zip" ] || fail "a failed fetch still uploaded"
+r2pub --prefix kalos-test --bundle "$B1/Dummy.app" >/dev/null
+[ -f "$STORE/kalos-updates/kalos-test/appcast.xml" ] || fail "--prefix did not publish to kalos-test/"
+ok "R2 merges with the bucket's appcast, refuses old builds, stops on fetch errors, honors --prefix"
 echo "all $PASS checks passed"

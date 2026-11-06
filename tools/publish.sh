@@ -7,17 +7,29 @@ KEY_ACCOUNT="sdusteric-apps"
 CONTRACT_KEY="PMaW+8sZRzOkfIwy1KBGk0CHTVoN49FE9o8gUlNGdZc="
 PAGES_BASE="https://sdusteric.github.io/app-updates"
 
+# Where each app publishes. An app listed here goes to a Cloudflare R2 bucket served from its own domain:
+# the files and the appcast go to <bucket>/<prefix>/, with no GitHub Release, commit or download page
+# (its own site serves first installs). Every other app uses GitHub Releases and GitHub Pages.
+R2_BUCKET="" R2_BASE=""
+r2_target() {
+  case "$1" in
+    kalos) R2_BUCKET="kalos-updates"; R2_BASE="${KALOS_UPDATES_BASE:-https://updates.kalosbrowser.com}" ;;
+  esac
+}
+# The command that talks to R2. Tests put a fake here.
+read -r -a WRANGLER <<<"${PUBLISH_WRANGLER:-pnpm dlx wrangler}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SIGN_UPDATE="$REPO_DIR/vendor/Sparkle-2.10.0/bin/sign_update"
 
 usage() {
-  echo "usage: publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--zip <file.zip>] [--channel <name>]" >&2
+  echo "usage: publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--port <n>] [--zip <file.zip>] [--channel <name>] [--prefix <name>]" >&2
   exit 2
 }
 die() { echo "publish.sh: error: $*" >&2; exit 1; }
 
-APP="" BUNDLE="" NOTES="" DRY_DIR="" PORT="8765" GIVEN_ZIP="" CHANNEL=""
+APP="" BUNDLE="" NOTES="" DRY_DIR="" PORT="8765" GIVEN_ZIP="" CHANNEL="" PREFIX=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --app) [ $# -ge 2 ] || usage; APP="$2"; shift 2 ;;
@@ -27,6 +39,7 @@ while [ $# -gt 0 ]; do
     --port) [ $# -ge 2 ] || usage; PORT="$2"; shift 2 ;;
     --zip) [ $# -ge 2 ] || usage; GIVEN_ZIP="$2"; shift 2 ;;
     --channel) [ $# -ge 2 ] || usage; CHANNEL="$2"; shift 2 ;;
+    --prefix) [ $# -ge 2 ] || usage; PREFIX="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -35,6 +48,13 @@ done
 [[ "$PORT" =~ ^[0-9]+$ ]] || die "--port must be a number"
 # Sparkle offers an item with <sparkle:channel> only to apps that allow that channel; with none, everyone gets it.
 [ -z "$CHANNEL" ] || [[ "$CHANNEL" =~ ^[a-z]+$ ]] || die "--channel must be lowercase letters"
+r2_target "$APP"
+# --prefix publishes somewhere other than <bucket>/<app>/, such as kalos-test/ for an end-to-end test.
+[ -z "$PREFIX" ] || [ -n "$R2_BUCKET" ] || die "--prefix is only for apps that publish to R2"
+PREFIX="${PREFIX:-$APP}"
+[[ "$PREFIX" =~ ^[a-z][a-z0-9-]*$ ]] || die "--prefix must be lowercase letters, digits and dashes"
+R2_BASE="${R2_BASE%/}"
+[ -z "$R2_BUCKET" ] || [[ "$R2_BASE" =~ ^https://[A-Za-z0-9.-]+$ ]] || die "the R2 base must be https://<host>, got '$R2_BASE'"
 [ -d "$BUNDLE" ] || die "bundle not found: $BUNDLE"
 [ -x "$SIGN_UPDATE" ] || die "sign_update not found at $SIGN_UPDATE"
 [ -z "$NOTES" ] || [ -f "$NOTES" ] || die "notes file not found: $NOTES"
@@ -58,11 +78,39 @@ done
 
 codesign --verify --deep --strict "$BUNDLE" 2>/dev/null || die "codesign --verify --deep --strict failed for $BUNDLE"
 
-# Where the appcast lives.
+WORK="$(mktemp -d)"
+cleanup() { [ -n "${WORK:-}" ] && [ -d "$WORK" ] && rm -rf "$WORK"; }
+trap cleanup EXIT
+
+# Where the appcast lives. For R2 the current one is fetched from the bucket, not the public address,
+# which can be cached. A missing object means a first release; any other error stops here, so old
+# items are never dropped.
+r2_fetch_appcast() {
+  local err="$WORK/r2-get.err"
+  if "${WRANGLER[@]}" r2 object get "$R2_BUCKET/$PREFIX/appcast.xml" --file "$APPCAST" --remote >/dev/null 2>"$err"; then
+    [ -s "$APPCAST" ] || die "$R2_BUCKET/$PREFIX/appcast.xml is empty"
+    xmllint --noout "$APPCAST" 2>/dev/null || die "$R2_BUCKET/$PREFIX/appcast.xml is not well-formed"
+    return 0
+  fi
+  rm -f "$APPCAST"
+  if grep -q "The specified key does not exist" "$err"; then
+    echo "publish.sh: no $R2_BUCKET/$PREFIX/appcast.xml yet, so this is the first release there"
+    return 0
+  fi
+  cat "$err" >&2
+  die "could not fetch $R2_BUCKET/$PREFIX/appcast.xml (log in with: pnpm dlx wrangler login); nothing was published"
+}
+
 if [ -n "$DRY_DIR" ]; then
   [ -d "$DRY_DIR" ] || die "dry-run dir does not exist: $DRY_DIR"
   OUT_DIR="$(cd "$DRY_DIR" && pwd)"
   APPCAST="$OUT_DIR/appcast.xml"
+elif [ -n "$R2_BUCKET" ]; then
+  command -v "${WRANGLER[0]}" >/dev/null || die "${WRANGLER[0]} is required to publish to R2"
+  OUT_DIR="$WORK/r2"
+  mkdir -p "$OUT_DIR"
+  APPCAST="$OUT_DIR/appcast.xml"
+  r2_fetch_appcast
 else
   OUT_DIR="$REPO_DIR/$APP"
   mkdir -p "$OUT_DIR"
@@ -83,11 +131,14 @@ ZIP_NAME="$NAME-$SHORT-$BUILD.zip"
 DMG_NAME="$NAME-$SHORT-$BUILD.dmg"
 TAG="$APP-v$SHORT-$BUILD"
 
-WORK="$(mktemp -d)"
-cleanup() { [ -n "${WORK:-}" ] && [ -d "$WORK" ] && rm -rf "$WORK"; }
-trap cleanup EXIT
-
-if [ -n "$DRY_DIR" ]; then
+if [ -n "$R2_BUCKET" ]; then
+  # A dry run of an R2 app keeps the real addresses, so the appcast shows what would ship.
+  [ -n "$DRY_DIR" ] && FILES="$OUT_DIR" || FILES="$WORK"
+  ZIP="$FILES/$ZIP_NAME"
+  URL="$R2_BASE/$PREFIX/$ZIP_NAME"
+  DMG="$FILES/$DMG_NAME"
+  DMG_URL="$R2_BASE/$PREFIX/$DMG_NAME"
+elif [ -n "$DRY_DIR" ]; then
   ZIP="$OUT_DIR/$ZIP_NAME"
   URL="http://127.0.0.1:$PORT/$ZIP_NAME"
   DMG="$OUT_DIR/$DMG_NAME"
@@ -127,9 +178,9 @@ case "$DMG_RC" in
 esac
 
 # <app>/download/ sends people to the newest disk image, so one link stays good across releases.
-# Beta releases leave it alone.
+# Beta releases leave it alone, and R2 apps have none.
 DOWNLOAD_PAGE=""
-if [ "$HAVE_DMG" = 1 ] && [ -z "$CHANNEL" ]; then
+if [ "$HAVE_DMG" = 1 ] && [ -z "$CHANNEL" ] && [ -z "$R2_BUCKET" ]; then
   DOWNLOAD_PAGE="$OUT_DIR/download/index.html"
   mkdir -p "$OUT_DIR/download"
   python3 -I - "$DOWNLOAD_PAGE" "$DISPLAY_NAME" "$SHORT" "$DMG_URL" <<'PY'
@@ -164,7 +215,7 @@ PY
 fi
 
 # Write or update the appcast.
-FEED_URL="$PAGES_BASE/$APP/appcast.xml"
+if [ -n "$R2_BUCKET" ]; then FEED_URL="$R2_BASE/$PREFIX/appcast.xml"; else FEED_URL="$PAGES_BASE/$APP/appcast.xml"; fi
 python3 -I - "$APPCAST" "$NOTES" "$APP" "$FEED_URL" "$SHORT" "$BUILD" "$MIN_OS" "$URL" "$LENGTH" "$SIG" "$PUBDATE" "$CHANNEL" <<'PY'
 import html, os, re, sys, tempfile
 appcast, notes, app, feed, short, build, minos, url, length, sig, pubdate, channel = sys.argv[1:13]
@@ -264,7 +315,21 @@ if [ -n "$DRY_DIR" ]; then
   exit 0
 fi
 
-# Real mode.
+# Real mode, R2: the zip, then the disk image, then the appcast, so the feed never names a file
+# that isn't there yet. File names carry the build number, so they never change once uploaded.
+r2_put() { # file key content-type cache-control
+  "${WRANGLER[@]}" r2 object put "$R2_BUCKET/$PREFIX/$2" --file "$1" --content-type "$3" --cache-control "$4" --remote >/dev/null \
+    || die "uploading $R2_BUCKET/$PREFIX/$2 failed; the appcast was not changed"
+}
+if [ -n "$R2_BUCKET" ]; then
+  r2_put "$ZIP" "$ZIP_NAME" application/zip "public, max-age=31536000, immutable"
+  [ "$HAVE_DMG" = 0 ] || r2_put "$DMG" "$DMG_NAME" application/x-apple-diskimage "public, max-age=31536000, immutable"
+  r2_put "$APPCAST" appcast.xml "application/xml; charset=utf-8" "no-cache"
+  echo "published: $APP $SHORT ($BUILD) to r2://$R2_BUCKET/$PREFIX feed=$FEED_URL length=$LENGTH dmg=$([ "$HAVE_DMG" = 1 ] && echo "$DMG_URL" || echo none)"
+  exit 0
+fi
+
+# Real mode, GitHub.
 command -v gh >/dev/null || die "gh is required"
 ASSETS=("$ZIP")
 [ "$HAVE_DMG" = 0 ] || ASSETS+=("$DMG")
