@@ -2,6 +2,10 @@
 # Notarize and staple a signed app bundle (see docs/notarization.md).
 #
 #   notarize.sh --bundle <path/App.app> --final-zip <path.zip> [--dry-run]
+#   notarize.sh --check-profile
+#
+# --check-profile tests only step 1 below and exits 0 or 1, so a release script can find a missing or
+# unreadable profile before its gate and build run, instead of after them.
 #
 # Exit codes:
 #   0   notarized and stapled; the stapled app is zipped to --final-zip
@@ -20,19 +24,40 @@
 set -uo pipefail
 
 PROFILE=sdusteric-notary
-BUNDLE="" FINAL="" DRY=0
+BUNDLE="" FINAL="" DRY=0 CHECK_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
+    --check-profile) CHECK_ONLY=1; shift ;;
     --bundle) [ $# -ge 2 ] || exit 2; BUNDLE=$2; shift 2 ;;
     --final-zip) [ $# -ge 2 ] || exit 2; FINAL=$2; shift 2 ;;
     --dry-run) DRY=1; shift ;;
-    *) echo "usage: notarize.sh --bundle <App.app> --final-zip <path.zip> [--dry-run]" >&2; exit 2 ;;
+    *) echo "usage: notarize.sh --bundle <App.app> --final-zip <path.zip> [--dry-run] | --check-profile" >&2; exit 2 ;;
   esac
 done
-[ -n "$BUNDLE" ] && [ -n "$FINAL" ] || { echo "usage: notarize.sh --bundle <App.app> --final-zip <path.zip> [--dry-run]" >&2; exit 2; }
+die() { echo "notarize: $*" >&2; exit 1; }
+
+# 1. The notary profile. history is a read-only call that also proves the credentials work.
+# While the screen is locked, notarytool cannot read the profile and says it does not exist, though it does.
+screen_locked() { ioreg -n Root -d1 -a 2>/dev/null | grep -A1 IOConsoleLocked | grep -q true; }
+check_profile() {
+  local out
+  if out=$(xcrun notarytool history --keychain-profile "$PROFILE" 2>&1); then
+    echo "profile $PROFILE: ok"
+  elif printf '%s' "$out" | grep -q 'No Keychain password item found' && screen_locked; then
+    die "the screen is locked, and notarytool cannot read the keychain profile '$PROFILE' while it is. Unlock the Mac and run this again. Nothing was submitted."
+  elif printf '%s' "$out" | grep -q 'No Keychain password item found'; then
+    die "the keychain profile '$PROFILE' does not exist. Create it with: xcrun notarytool store-credentials $PROFILE --apple-id <id> --team-id 8N9KUZLT8N (see app-updates/docs/notarization.md)"
+  elif [ "$DRY" = 1 ]; then
+    echo "notarize: could not reach the notary service to test profile '$PROFILE' (dry run, going on): $(printf '%s' "$out" | head -n 1)"
+  else
+    die "the keychain profile '$PROFILE' did not work: $(printf '%s' "$out" | head -n 3)"
+  fi
+}
+if [ "$CHECK_ONLY" = 1 ]; then check_profile; exit 0; fi
+
+[ -n "$BUNDLE" ] && [ -n "$FINAL" ] || { echo "usage: notarize.sh --bundle <App.app> --final-zip <path.zip> [--dry-run] | --check-profile" >&2; exit 2; }
 [ -d "$BUNDLE" ] || { echo "notarize: no bundle at $BUNDLE" >&2; exit 1; }
 BUNDLE="$(cd "$BUNDLE" && pwd -P)"
-die() { echo "notarize: $*" >&2; exit 1; }
 
 AUTH=$(codesign -dvv "$BUNDLE" 2>&1 | sed -n 's/^Authority=//p' | head -n 1)
 case "$AUTH" in
@@ -42,18 +67,7 @@ case "$AUTH" in
     exit 10 ;;
 esac
 
-# 1. The notary profile. history is a read-only call that also proves the credentials work.
-if ! out=$(xcrun notarytool history --keychain-profile "$PROFILE" 2>&1); then
-  if printf '%s' "$out" | grep -q 'No Keychain password item found'; then
-    die "the app is signed with Developer ID but the keychain profile '$PROFILE' does not exist. Create it with: xcrun notarytool store-credentials $PROFILE --apple-id <id> --team-id 8N9KUZLT8N (see app-updates/docs/notarization.md)"
-  elif [ "$DRY" = 1 ]; then
-    echo "notarize: could not reach the notary service to test profile '$PROFILE' (dry run, going on): $(printf '%s' "$out" | head -n 1)"
-  else
-    die "the keychain profile '$PROFILE' did not work: $(printf '%s' "$out" | head -n 3)"
-  fi
-else
-  echo "profile $PROFILE: ok"
-fi
+check_profile
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/notarize.XXXXXX")" || die "mktemp failed"
 cleanup() { [ -n "${WORK:-}" ] && [ -d "$WORK" ] && rm -rf "$WORK"; }

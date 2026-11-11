@@ -38,5 +38,9 @@ After this, grants survive updates, because every later build uses the same Deve
 - `scripts/check-signing.sh` (called by `check.sh` or `release.sh`) asserts the hardened runtime flag, that the entitlements equal the checked-in file, and that every nested Mach-O has the same team.
 - `release.sh` calls `tools/notarize.sh`: ditto zip, `notarytool submit --wait` (the notary log is printed on failure), `stapler staple`, `spctl` must say "Notarized Developer ID", then a new zip of the stapled app is passed to `publish.sh --zip`, so the Sparkle EdDSA signature covers the final file.
 - `publish.sh` then calls `tools/make-dmg.sh`: a disk image with the app and an Applications link, signed with the app's certificate, submitted on its own (`notarytool submit --wait`), stapled, and `spctl -a -t open --context context:primary-signature` must say "Notarized Developer ID". A failure stops the release before anything is uploaded.
+- `notarize.sh --check-profile` tests only the profile. A release script runs it before its gate and build, so a missing
+  or unreadable profile stops the release in seconds rather than after the build. While the screen is locked,
+  `notarytool` cannot read the profile and says it does not exist; `notarize.sh` says the screen is locked instead.
+  Publish with the Mac unlocked.
 - With a Developer ID build but no profile, `release.sh` stops with a message. With the Apple Development fallback it prints a warning (the build will not open on other Macs) and goes on.
 - `release.sh --dry-run <dir>` runs every step except the submit and prints the commands it would run.
