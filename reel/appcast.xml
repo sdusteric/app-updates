@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>reel</title>
+    <link>https://sdusteric.github.io/app-updates/reel/appcast.xml</link>
+    <description>Updates for reel</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Tue, 17 Nov 2026 06:11:31 +0000</pubDate>
+      <sparkle:version>202611170610</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<p>First public release of Reel, a video player with its own playback engine, so seeking is fast.</p>
+<ul>
+<li>Plays H.264, HEVC, AV1 and VP9 in mkv, mp4, webm and other containers</li>
+<li>Subtitles in SRT, ASS, WebVTT and PGS, rendered with libass</li>
+<li>Resumes where you left off, even after the file is renamed or moved</li>
+<li>HDR10 and HLG on displays that support them</li>
+</ul>
+<p>Needs macOS 27 on Apple Silicon.</p>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/reel/releases/download/v0.1.0/Reel-0.1.0-202611170610.zip" length="8174445" type="application/octet-stream" sparkle:edSignature="/OUN3liKYlSE2QLxyJCLCp3NXZUc1KKnJSlmJ5NPu6/5iZChsqk5E1VM+KMGiYzPxvb0DzP0C6aN/uvDyNZ5BA=="/>
+    </item>
+  </channel>
+</rss>
