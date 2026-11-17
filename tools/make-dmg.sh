@@ -3,7 +3,8 @@
 #
 #   make-dmg.sh --bundle <path/App.app> --out <path.dmg> [--dry-run]
 #
-# The image holds the app and an Applications link, so people drag the app out of Downloads,
+# The image holds the app and an Applications link in a laid-out window (dmg/, tools/dmg-settings.py),
+# so people drag the app out of Downloads,
 # where Sparkle cannot always update it. Sparkle updates keep using the zip.
 #
 # Exit codes:
@@ -34,13 +35,27 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/make-dmg.XXXXXX")" || die "mktemp failed"
 cleanup() { [ -n "${WORK:-}" ] && [ -d "$WORK" ] && rm -rf "$WORK"; }
 trap cleanup EXIT
 
-# 1. The image: the app and a link to /Applications, compressed with LZFSE.
-mkdir "$WORK/stage" || die "mkdir failed"
-ditto "$BUNDLE" "$WORK/stage/$NAME.app" || die "ditto failed"
-ln -s /Applications "$WORK/stage/Applications" || die "ln failed"
+# 1. The image: the app and a link to /Applications in a laid-out window (tools/dmg-settings.py),
+# compressed with LZFSE. dmgbuild writes the window's .DS_Store itself, so no Finder window opens.
+# The background is dmg/<Name>.tiff when there is one (tools/render-dmg-backgrounds.sh), else none.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV="$ROOT/vendor/dmgbuild"
+if [ ! -x "$VENV/bin/dmgbuild" ]; then
+  echo "+ setting up $VENV from tools/dmg-requirements.txt (pinned hashes)"
+  python3 -m venv "$VENV" || die "python3 -m venv failed"
+  "$VENV/bin/pip" install -q --disable-pip-version-check --require-hashes --no-deps --only-binary :all: \
+    -r "$ROOT/tools/dmg-requirements.txt" || { rm -rf "$VENV"; die "installing dmgbuild failed"; }
+fi
+BACKGROUND=""
+[ -f "$ROOT/dmg/$NAME.tiff" ] && BACKGROUND="$ROOT/dmg/$NAME.tiff"
+ICON_FILE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$BUNDLE/Contents/Info.plist" 2>/dev/null || true)"
+VOLICON=""
+[ -n "$ICON_FILE" ] && [ -f "$BUNDLE/Contents/Resources/${ICON_FILE%.icns}.icns" ] && VOLICON="$BUNDLE/Contents/Resources/${ICON_FILE%.icns}.icns"
 rm -f "$OUT"
-echo "+ hdiutil create -volname $NAME -srcfolder <app and Applications link> -fs HFS+ -format ULFO $OUT"
-hdiutil create -quiet -volname "$NAME" -srcfolder "$WORK/stage" -fs HFS+ -format ULFO -ov "$OUT" || die "hdiutil create failed"
+echo "+ dmgbuild -s tools/dmg-settings.py -D app=$BUNDLE -D background=${BACKGROUND:-none} $NAME $OUT"
+"$VENV/bin/dmgbuild" -s "$ROOT/tools/dmg-settings.py" -D app="$BUNDLE" -D background="$BACKGROUND" \
+  -D icon="$VOLICON" "$NAME" "$OUT" >"$WORK/dmgbuild.log" 2>&1 || { cat "$WORK/dmgbuild.log" >&2; die "dmgbuild failed"; }
+[ -f "$OUT" ] || die "dmgbuild made no image"
 
 AUTH=$(codesign -dvv "$BUNDLE" 2>&1 | sed -n 's/^Authority=//p' | head -n 1)
 case "$AUTH" in

@@ -141,7 +141,10 @@ fi
 DISPLAY_NAME="$(basename "$BUNDLE" .app)"
 NAME="${DISPLAY_NAME// /-}"
 ZIP_NAME="$NAME-$SHORT-$BUILD.zip"
-DMG_NAME="$NAME-$SHORT-$BUILD.dmg"
+# People see the disk image name, so on GitHub it is just the app and its version (each release
+# has its own tag). R2 files are cached forever, so there it keeps the build number.
+DMG_NAME="$NAME-$SHORT.dmg"
+[ -z "$R2_BUCKET" ] || DMG_NAME="$NAME-$SHORT-$BUILD.dmg"
 TAG="$APP-v$SHORT-$BUILD"
 RELEASE_REPO="$REPO_SLUG" TARGET=""
 if [ -n "$OWN_REPO" ]; then
@@ -369,7 +372,7 @@ ASSETS=("$ZIP")
 if [ -n "$OWN_REPO" ]; then
   NOTES_FILE="$WORK/release-notes.md"
   if [ -n "$NOTES" ]; then cp "$NOTES" "$NOTES_FILE"; else printf '%s %s\n' "$DISPLAY_NAME" "$SHORT" >"$NOTES_FILE"; fi
-  printf '\nBuild %s. Download the disk image, open it and drag %s to Applications. It updates itself after that.\n' "$BUILD" "$DISPLAY_NAME" >>"$NOTES_FILE"
+  printf '\nBuild %s. Download %s, open it and drag %s into Applications. It updates itself after that.\n' "$BUILD" "$DMG_NAME" "$DISPLAY_NAME" >>"$NOTES_FILE"
   gh release create "$TAG" "${ASSETS[@]}" --repo "$RELEASE_REPO" --target "$TARGET" --title "$DISPLAY_NAME $SHORT" --notes-file "$NOTES_FILE"
 else
   gh release create "$TAG" "${ASSETS[@]}" --repo "$REPO_SLUG" --title "$APP $SHORT ($BUILD)" --notes "${APP} ${SHORT} (build ${BUILD})"
