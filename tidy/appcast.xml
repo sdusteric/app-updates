@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>tidy</title>
+    <link>https://sdusteric.github.io/app-updates/tidy/appcast.xml</link>
+    <description>Updates for tidy</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Tue, 17 Nov 2026 06:18:04 +0000</pubDate>
+      <sparkle:version>202611170615</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<p>First public release of Tidy. It finds space you can get back, shows what uses your disk and memory, and runs a security check. Anything it removes goes to the Trash.</p>
+<ul>
+<li>Cleans caches, logs, build output and old installers, and says why each one is safe to remove</li>
+<li>Shows the largest files and folders as a size map</li>
+<li>Reads memory pressure and lists the apps using the most</li>
+<li>Uninstalls an app along with what it left in your Library</li>
+</ul>
+<p>Needs macOS 14 or later on Apple Silicon.</p>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/tidy/releases/download/v0.1.0/Tidy-0.1.0-202611170615.zip" length="8663163" type="application/octet-stream" sparkle:edSignature="TQUz8WVXFPSYMl3S1sjdvXSrVdyMJ/qty0PgiCY2863kMIY0S2tjsfJv1lqK67e7SWdpbOQi7E8K4SNrebEBCg=="/>
+    </item>
+  </channel>
+</rss>
