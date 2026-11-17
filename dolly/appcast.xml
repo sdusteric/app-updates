@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>dolly</title>
+    <link>https://sdusteric.github.io/app-updates/dolly/appcast.xml</link>
+    <description>Updates for dolly</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Tue, 17 Nov 2026 06:22:32 +0000</pubDate>
+      <sparkle:version>202611170621</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<p>First public release of Dolly. It records a demo of your screen, turns your clicks into zooms, and exports a clip sized for X and Threads.</p>
+<ul>
+<li>Zooms in where you click and draws a smooth pointer in place of the real one</li>
+<li>Move, resize, deepen or remove any zoom on the timeline</li>
+<li>Camera and microphone beside the screen, with captions transcribed on your Mac</li>
+<li>Exports 16:9, 1:1, 4:5 and 9:16 in one go, with an .srt file if you want one</li>
+</ul>
+<p>Needs macOS 27 on Apple Silicon.</p>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/dolly/releases/download/v0.1.0/Dolly-0.1.0-202611170621.zip" length="2877330" type="application/octet-stream" sparkle:edSignature="n3JbUSGvUZCydOYEGiucJoNZNRxBaBezgAh8o+CCnLGPlvDQdZ4psCgOmG4r+5WHxLmGoGdmfMIBFxCBTlrYCw=="/>
+    </item>
+  </channel>
+</rss>
