@@ -16,6 +16,18 @@ r2_target() {
     kalos) R2_BUCKET="kalos-updates"; R2_BASE="${KALOS_UPDATES_BASE:-https://updates.kalosbrowser.com}" ;;
   esac
 }
+# Apps whose source is public get their GitHub Release in their own repo, tagged v<short> at the
+# commit the build came from (the checkout next to this repo, which must be clean and pushed).
+# Private apps keep theirs here, where a private repo's assets would need a login to download.
+OWN_REPO=""
+github_target() {
+  case "$1" in
+    reel) OWN_REPO="sdusteric/reel" ;;
+    tidy) OWN_REPO="sdusteric/tidy" ;;
+    snap) OWN_REPO="sdusteric/still" ;;
+    dolly) OWN_REPO="sdusteric/dolly" ;;
+  esac
+}
 # The command that talks to R2. Tests put a fake here.
 read -r -a WRANGLER <<<"${PUBLISH_WRANGLER:-pnpm dlx wrangler}"
 
@@ -49,6 +61,7 @@ done
 # Sparkle offers an item with <sparkle:channel> only to apps that allow that channel; with none, everyone gets it.
 [ -z "$CHANNEL" ] || [[ "$CHANNEL" =~ ^[a-z]+$ ]] || die "--channel must be lowercase letters"
 r2_target "$APP"
+github_target "$APP"
 # --prefix publishes somewhere other than <bucket>/<app>/, such as kalos-test/ for an end-to-end test.
 [ -z "$PREFIX" ] || [ -n "$R2_BUCKET" ] || die "--prefix is only for apps that publish to R2"
 PREFIX="${PREFIX:-$APP}"
@@ -130,6 +143,26 @@ NAME="${DISPLAY_NAME// /-}"
 ZIP_NAME="$NAME-$SHORT-$BUILD.zip"
 DMG_NAME="$NAME-$SHORT-$BUILD.dmg"
 TAG="$APP-v$SHORT-$BUILD"
+RELEASE_REPO="$REPO_SLUG" TARGET=""
+if [ -n "$OWN_REPO" ]; then
+  RELEASE_REPO="$OWN_REPO"
+  TAG="v$SHORT"
+fi
+
+# A real release in an app's own repo: the tag must be new and the source must be what GitHub has,
+# so the tag points at the commit the build came from. Checked before anything is signed or uploaded.
+if [ -n "$OWN_REPO" ] && [ -z "$DRY_DIR" ]; then
+  command -v gh >/dev/null || die "gh is required"
+  SRC="$(cd "$REPO_DIR/.." && pwd)/$APP"
+  [ -d "$SRC/.git" ] || die "the $APP checkout is not at $SRC"
+  [ -z "$(git -C "$SRC" status --porcelain --untracked-files=no)" ] || die "$SRC has uncommitted changes; commit and push them first"
+  git -C "$SRC" fetch -q origin main || die "could not fetch $OWN_REPO"
+  TARGET="$(git -C "$SRC" rev-parse HEAD)"
+  [ "$TARGET" = "$(git -C "$SRC" rev-parse origin/main)" ] || die "$SRC is not at origin/main; push it first"
+  if gh release view "$TAG" --repo "$OWN_REPO" >/dev/null 2>&1 || git -C "$SRC" ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+    die "$OWN_REPO already has $TAG; raise VERSION for a new release"
+  fi
+fi
 
 if [ -n "$R2_BUCKET" ]; then
   # A dry run of an R2 app keeps the real addresses, so the appcast shows what would ship.
@@ -145,9 +178,9 @@ elif [ -n "$DRY_DIR" ]; then
   DMG_URL="http://127.0.0.1:$PORT/$DMG_NAME"
 else
   ZIP="$WORK/$ZIP_NAME"
-  URL="https://github.com/$REPO_SLUG/releases/download/$TAG/$ZIP_NAME"
+  URL="https://github.com/$RELEASE_REPO/releases/download/$TAG/$ZIP_NAME"
   DMG="$WORK/$DMG_NAME"
-  DMG_URL="https://github.com/$REPO_SLUG/releases/download/$TAG/$DMG_NAME"
+  DMG_URL="https://github.com/$RELEASE_REPO/releases/download/$TAG/$DMG_NAME"
 fi
 
 rm -f "$ZIP"
@@ -311,7 +344,7 @@ PY
 xmllint --noout "$APPCAST" || die "generated appcast is not well-formed"
 
 if [ -n "$DRY_DIR" ]; then
-  echo "dry-run: $APP $SHORT ($BUILD) zip=$ZIP appcast=$APPCAST url=$URL length=$LENGTH dmg=$([ "$HAVE_DMG" = 1 ] && echo "$DMG" || echo none) download=${DOWNLOAD_PAGE:-unchanged}"
+  echo "dry-run: $APP $SHORT ($BUILD) release=$RELEASE_REPO@$TAG zip=$ZIP appcast=$APPCAST url=$URL length=$LENGTH dmg=$([ "$HAVE_DMG" = 1 ] && echo "$DMG" || echo none) download=${DOWNLOAD_PAGE:-unchanged}"
   exit 0
 fi
 
@@ -333,10 +366,17 @@ fi
 command -v gh >/dev/null || die "gh is required"
 ASSETS=("$ZIP")
 [ "$HAVE_DMG" = 0 ] || ASSETS+=("$DMG")
-gh release create "$TAG" "${ASSETS[@]}" --repo "$REPO_SLUG" --title "$APP $SHORT ($BUILD)" --notes "${APP} ${SHORT} (build ${BUILD})"
+if [ -n "$OWN_REPO" ]; then
+  NOTES_FILE="$WORK/release-notes.md"
+  if [ -n "$NOTES" ]; then cp "$NOTES" "$NOTES_FILE"; else printf '%s %s\n' "$DISPLAY_NAME" "$SHORT" >"$NOTES_FILE"; fi
+  printf '\nBuild %s. Download the disk image, open it and drag %s to Applications. It updates itself after that.\n' "$BUILD" "$DISPLAY_NAME" >>"$NOTES_FILE"
+  gh release create "$TAG" "${ASSETS[@]}" --repo "$RELEASE_REPO" --target "$TARGET" --title "$DISPLAY_NAME $SHORT" --notes-file "$NOTES_FILE"
+else
+  gh release create "$TAG" "${ASSETS[@]}" --repo "$REPO_SLUG" --title "$APP $SHORT ($BUILD)" --notes "${APP} ${SHORT} (build ${BUILD})"
+fi
 PATHS=("$APP/appcast.xml")
 [ -z "$DOWNLOAD_PAGE" ] || PATHS+=("$APP/download/index.html")
 git -C "$REPO_DIR" add "${PATHS[@]}"
 git -C "$REPO_DIR" commit -m "$APP $SHORT ($BUILD)" -- "${PATHS[@]}"
 git -C "$REPO_DIR" push origin main
-echo "published: $APP $SHORT ($BUILD) release=$TAG feed=$FEED_URL length=$LENGTH${DOWNLOAD_PAGE:+ download=$PAGES_BASE/$APP/download/}"
+echo "published: $APP $SHORT ($BUILD) release=$RELEASE_REPO@$TAG feed=$FEED_URL length=$LENGTH${DOWNLOAD_PAGE:+ download=$PAGES_BASE/$APP/download/}"

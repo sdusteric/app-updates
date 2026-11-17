@@ -173,4 +173,13 @@ if FAKE_GET_ERROR=1 r2pub --bundle "$B5/Dummy.app" >/dev/null 2>&1; then fail "R
 r2pub --prefix kalos-test --bundle "$B1/Dummy.app" >/dev/null
 [ -f "$STORE/kalos-updates/kalos-test/appcast.xml" ] || fail "--prefix did not publish to kalos-test/"
 ok "R2 merges with the bucket's appcast, refuses old builds, stops on fetch errors, honors --prefix"
+
+# Public apps release in their own repo, tagged v<short>; the rest stay here, tagged <app>-v<short>-<build>.
+OWN="$T/own"; mkdir "$OWN"
+line="$("$ROOT/tools/publish.sh" --app snap --bundle "$B1/Dummy.app" --dry-run "$OWN" | grep '^dry-run:')"
+[[ "$line" == *"release=sdusteric/still@v1.0.0 "* ]] || fail "snap release target: $line"
+OTHER="$T/other"; mkdir "$OTHER"
+line="$("$ROOT/tools/publish.sh" --app booth --bundle "$B1/Dummy.app" --dry-run "$OTHER" | grep '^dry-run:')"
+[[ "$line" == *"release=sdusteric/app-updates@booth-v1.0.0-202601010101 "* ]] || fail "booth release target: $line"
+ok "public apps release in their own repo, private apps here"
 echo "all $PASS checks passed"
