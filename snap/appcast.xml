@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>snap</title>
+    <link>https://sdusteric.github.io/app-updates/snap/appcast.xml</link>
+    <description>Updates for snap</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Tue, 17 Nov 2026 06:20:30 +0000</pubDate>
+      <sparkle:version>202611170619</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<p>First public release of Still, a menu bar app for screenshots and screen recordings.</p>
+<ul>
+<li>Area, window and fullscreen captures, with a card in the corner to save, copy or edit</li>
+<li>Backgrounds, arrows, text, numbered steps and redaction</li>
+<li>Copy Text reads the text in a capture on your Mac</li>
+<li>Records the screen to mp4, with system audio and the microphone if you turn them on</li>
+</ul>
+<p>Needs macOS 27 on Apple Silicon.</p>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/still/releases/download/v0.1.0/Still-0.1.0-202611170619.zip" length="4931880" type="application/octet-stream" sparkle:edSignature="OT1xDkMenTIFLiGy6nSAKr9menTSV6fT2oELLGrinLKAQxm8m5dTkmbZikOi8cSqi2ZfVKGhAsDYn+9Y0qKwBw=="/>
+    </item>
+  </channel>
+</rss>
