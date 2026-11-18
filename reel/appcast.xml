@@ -6,6 +6,21 @@
     <description>Updates for reel</description>
     <language>en</language>
     <item>
+      <title>Version 0.1.1</title>
+      <pubDate>Wed, 18 Nov 2026 07:14:22 +0000</pubDate>
+      <sparkle:version>202611180713</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<ul>
+<li>Pressing the fullscreen key while the mini player is already closing now still goes fullscreen.</li>
+<li>Two quick arrow-key seeks no longer make the seek bar jump back to the first position.</li>
+<li>Closing a file while another is opening is safer.</li>
+</ul>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/reel/releases/download/v0.1.1/Reel-0.1.1-202611180713.zip" length="8176560" type="application/octet-stream" sparkle:edSignature="KAv5WH8AOqHpkUeYDqSdO+DH+JxTgtOaI45I9vHQZ4FC8pcKSWATfslS64Rxx9bTWkTWLpgr/r5/A0DKJZFaDQ=="/>
+    </item>
+    <item>
       <title>Version 0.1.0</title>
       <pubDate>Tue, 17 Nov 2026 06:11:31 +0000</pubDate>
       <sparkle:version>202611170610</sparkle:version>
