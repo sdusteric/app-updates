@@ -6,6 +6,20 @@
     <description>Updates for snap</description>
     <language>en</language>
     <item>
+      <title>Version 0.1.1</title>
+      <pubDate>Wed, 18 Nov 2026 07:17:17 +0000</pubDate>
+      <sparkle:version>202611180716</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<ul>
+<li>A capture shortcut pressed during the record countdown no longer resets the countdown.</li>
+<li>If History could not be read, it is read again the next time you open it.</li>
+</ul>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/still/releases/download/v0.1.1/Still-0.1.1-202611180716.zip" length="4864431" type="application/octet-stream" sparkle:edSignature="HP6wWxasYCs5x+z/c8ntEcNBwnGNUONB3tYkLa4ifMFG2yhFgBL6pCwbmMWmQ0RKyFAA9q4eaO5EzNclG1oIAQ=="/>
+    </item>
+    <item>
       <title>Version 0.1.0</title>
       <pubDate>Tue, 17 Nov 2026 06:20:30 +0000</pubDate>
       <sparkle:version>202611170619</sparkle:version>
