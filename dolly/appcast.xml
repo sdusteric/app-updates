@@ -6,6 +6,21 @@
     <description>Updates for dolly</description>
     <language>en</language>
     <item>
+      <title>Version 0.1.1</title>
+      <pubDate>Wed, 18 Nov 2026 07:10:22 +0000</pubDate>
+      <sparkle:version>202611180709</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<ul>
+<li>A recording whose window closes or whose stream stops right as it starts now ends at once. Before, Dolly kept showing a recording that captured nothing.</li>
+<li>A late stop from an earlier take no longer ends the take you are recording.</li>
+<li>A take saved while the recording was still starting now opens in the editor.</li>
+</ul>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/dolly/releases/download/v0.1.1/Dolly-0.1.1-202611180709.zip" length="2881632" type="application/octet-stream" sparkle:edSignature="6Wla8/YUSz4OLOjorXDjKNzUlMtwGumkJ6T9vMsgfSwZlTvunBU2e/7J8O+DzapFWiT8peYdfKwKmA8tFStCBA=="/>
+    </item>
+    <item>
       <title>Version 0.1.0</title>
       <pubDate>Tue, 17 Nov 2026 06:22:32 +0000</pubDate>
       <sparkle:version>202611170621</sparkle:version>
