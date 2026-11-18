@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>shelf</title>
+    <link>https://sdusteric.github.io/app-updates/shelf/appcast.xml</link>
+    <description>Updates for shelf</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Wed, 18 Nov 2026 07:19:24 +0000</pubDate>
+      <sparkle:version>202611180718</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<ul>
+<li>Live status lines no longer get stuck on an old value when several apps report at once.</li>
+<li>A search answer that arrives after you leave search is ignored.</li>
+</ul>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/app-updates/releases/download/shelf-v0.1.0-202611180718/Shelf-0.1.0-202611180718.zip" length="2209099" type="application/octet-stream" sparkle:edSignature="V3CsNw0DFKt+tYqvShKo0KhjiN2gRbo2KIOC7tJd1E6GzfYcWu6fLOo/KM5yCpGLuVYK7bvcwoUtKCGdY+MPBw=="/>
+    </item>
+  </channel>
+</rss>
