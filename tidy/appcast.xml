@@ -6,6 +6,20 @@
     <description>Updates for tidy</description>
     <language>en</language>
     <item>
+      <title>Version 0.1.1</title>
+      <pubDate>Wed, 18 Nov 2026 07:31:08 +0000</pubDate>
+      <sparkle:version>202611180728</sparkle:version>
+      <sparkle:shortVersionString>0.1.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<ul>
+<li>Check up now waits for a Cleanup scan or Security check that is already running, so two never run at once.</li>
+<li>Progress and errors for Move to Trash show on the screen that started them when several are queued.</li>
+</ul>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/tidy/releases/download/v0.1.1/Tidy-0.1.1-202611180728.zip" length="8673919" type="application/octet-stream" sparkle:edSignature="W08d25c5k4LmjB2k3C6DIc1UNyqt+vkE28r4AF8C5J0aFjIS0VeQ3sZF2xhZmgVQTScroS5O84DKdfKT46VbDw=="/>
+    </item>
+    <item>
       <title>Version 0.1.0</title>
       <pubDate>Tue, 17 Nov 2026 06:18:04 +0000</pubDate>
       <sparkle:version>202611170615</sparkle:version>
