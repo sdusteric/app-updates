@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>booth</title>
+    <link>https://sdusteric.github.io/app-updates/booth/appcast.xml</link>
+    <description>Updates for booth</description>
+    <language>en</language>
+    <item>
+      <title>Version 0.1.0</title>
+      <pubDate>Wed, 18 Nov 2026 07:26:56 +0000</pubDate>
+      <sparkle:version>202611180726</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>27.0</sparkle:minimumSystemVersion>
+      <description><![CDATA[
+<ul>
+<li>A guest track that was importing when Booth quit is imported again on the next launch. Before, it stayed on "Importing and aligning".</li>
+<li>If the connection drops when you press Record or Stop, the guest is told as soon as it is back.</li>
+<li>If the call page reloads, Booth joins the call again.</li>
+</ul>
+]]></description>
+      <enclosure url="https://github.com/sdusteric/app-updates/releases/download/booth-v0.1.0-202611180726/Booth-0.1.0-202611180726.zip" length="6936006" type="application/octet-stream" sparkle:edSignature="gr2aVmTLEfl/Pike4nZwBuCv2nJXl82svAN1dMbewd7fZEBHWNaj8/6Td2NqCjVYjJ4z+cjBhNCsrIA1IJm+Dg=="/>
+    </item>
+  </channel>
+</rss>
