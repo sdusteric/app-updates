@@ -61,14 +61,14 @@ hdiutil attach -quiet -nobrowse -noautoopen -readonly -mountpoint "$MNT" "$DMG" 
 in_image=0; signed=0
 { [ -x "$MNT/Dummy.app/Contents/MacOS/Dummy" ] && [ "$(readlink "$MNT/Applications")" = /Applications ]; } || in_image=$?
 codesign --verify --deep --strict "$MNT/Dummy.app" 2>/dev/null || signed=$?
-# The window layout from tools/dmg-settings.py: the app at (150, 190), Applications at (450, 190).
+# The window layout from tools/dmg-settings.py: the app at (150, 208), Applications at (450, 208).
 laid_out=0
 "$ROOT/vendor/dmgbuild/bin/python" -I - "$MNT/.DS_Store" <<'PY' || laid_out=$?
 import sys
 from ds_store import DSStore
 with DSStore.open(sys.argv[1], "r") as d:
-    assert d["Dummy.app"]["Iloc"] == (150, 190), d["Dummy.app"]["Iloc"]
-    assert d["Applications"]["Iloc"] == (450, 190), d["Applications"]["Iloc"]
+    assert d["Dummy.app"]["Iloc"] == (150, 208), d["Dummy.app"]["Iloc"]
+    assert d["Applications"]["Iloc"] == (450, 208), d["Applications"]["Iloc"]
 PY
 hdiutil detach -quiet "$MNT" || fail "disk image does not detach"
 [ "$in_image" = 0 ] || fail "disk image lacks Dummy.app or the Applications link"

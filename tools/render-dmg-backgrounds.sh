@@ -8,11 +8,13 @@
 # the luminance line printed below before committing it.
 set -euo pipefail
 
+# Optional: names to render only those apps (render-dmg-backgrounds.sh Kalos).
 APPS=(
   "Reel #6A7591"
   "Tidy #258372"
   "Still #7A66CA"
   "Dolly #C24B7B"
+  "Kalos #5577A4"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,11 +27,12 @@ trap '[ -n "${WORK:-}" ] && [ -d "$WORK" ] && rm -rf "$WORK"' EXIT
 
 for entry in "${APPS[@]}"; do
   name="${entry%% *}" color="${entry##* }"
+  if [ $# -gt 0 ] && [[ " $* " != *" $name "* ]]; then continue; fi
   url="file://$DMG_DIR/window.html?app=$name&field=%23${color#\#}"
   for scale in 1 2; do
     out="$WORK/$name@${scale}x.png"
     "$CHROME" --headless=new --disable-gpu --hide-scrollbars --no-first-run --user-data-dir="$WORK/profile" \
-      --window-size=600,360 --force-device-scale-factor="$scale" --screenshot="$out" "$url" >/dev/null 2>&1
+      --window-size=600,384 --force-device-scale-factor="$scale" --screenshot="$out" "$url" >/dev/null 2>&1
     [ -s "$out" ] || { echo "render-dmg-backgrounds: no image for $name at ${scale}x" >&2; exit 1; }
   done
   mv "$WORK/$name@1x.png" "$WORK/$name.png"

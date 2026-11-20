@@ -1,14 +1,15 @@
 <!doctype html>
 <!-- The install window behind the icons in each app's disk image. tools/render-dmg-backgrounds.sh
      renders it per app (?app=Reel&field=%236A7591) at 1x and 2x into dmg/<Name>.tiff.
-     Geometry must match tools/dmg-settings.py: window 600x360 pt, icons 128 pt centered at
-     (150, 190) for the app and (450, 190) for Applications. The field color is picked so Finder's
-     icon labels (black in light mode, white in dark mode) both pass 4.5:1. -->
+     Geometry must match tools/dmg-settings.py: a 600x384 pt picture, 128 pt icons centered at
+     (150, 208) for the app and (450, 208) for Applications. Finder may hide the bottom 36 pt behind
+     its tab bar, so nothing important goes below y 300. The field color is picked so Finder's icon
+     labels (black in light mode, white in dark mode) both pass 4.5:1. -->
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-  html, body { margin: 0; width: 600px; height: 360px; overflow: hidden; }
+  html, body { margin: 0; width: 600px; height: 384px; overflow: hidden; }
   body {
     background: var(--field);
     font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
@@ -16,11 +17,11 @@
     -webkit-font-smoothing: antialiased;
   }
   h1 {
-    position: absolute; left: 0; right: 0; top: 52px; margin: 0;
+    position: absolute; left: 0; right: 0; top: 74px; margin: 0;
     text-align: center; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2;
   }
   .well {
-    position: absolute; left: 384px; top: 124px; width: 132px; height: 132px; border-radius: 30px;
+    position: absolute; left: 384px; top: 142px; width: 132px; height: 132px; border-radius: 30px;
     background: color-mix(in oklab, var(--field) 80%, #000);
   }
   svg { position: absolute; left: 0; top: 0; }
@@ -29,9 +30,9 @@
 <body>
   <h1 id="line"></h1>
   <div class="well"></div>
-  <svg width="600" height="360" viewBox="0 0 600 360" aria-hidden="true">
-    <path d="M238 190 H352" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-    <path d="M342 180 L353 190 L342 200" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <svg width="600" height="384" viewBox="0 0 600 384" aria-hidden="true">
+    <path d="M238 208 H352" stroke="#fff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M342 198 L353 208 L342 218" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   </svg>
   <script>
     const q = new URLSearchParams(location.search);
