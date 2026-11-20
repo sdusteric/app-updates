@@ -1,0 +1,42 @@
+<!doctype html>
+<!-- Kalos's own install window, in the site's Aegean light look (pane/DESIGN.md): the sea at dusk
+     from the site's closing band, the line in GFS Didot. tools/render-dmg-backgrounds.sh renders it
+     at 1x and 2x into dmg/Kalos.tiff. Geometry as in dmg/window.html and tools/dmg-settings.py:
+     600x384 pt, icons centered at (150, 208) and (450, 208), Finder's labels near y 276 to 292.
+     The water under the labels is toned to a luminance near 0.179, so Finder's black (light mode)
+     and white (dark mode) labels both pass 4.5:1; the render script measures it.
+     dusk.webp: the site's photos/dusk.webp cropped to 1200x768 from (168, 217), made with the Codex
+     CLI on 2026-11-08 (prompt in pane/site/public/assets/photos/dusk.webp.json).
+     gfs-didot-400.woff2: GFS Didot, Greek Font Society, SIL Open Font License 1.1. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "GFS Didot"; src: url("gfs-didot-400.woff2") format("woff2"); }
+  html, body { margin: 0; width: 600px; height: 384px; overflow: hidden; }
+  body {
+    background:
+      linear-gradient(to bottom, rgba(var(--c), 0) 0, rgba(var(--c), 0) 246px,
+        rgba(var(--c), var(--tone)) 268px, rgba(var(--c), var(--tone)) 384px),
+      url("dusk.webp") 0 0 / 600px 384px no-repeat;
+    --tone: 0.6; --c: 84, 104, 130;
+  }
+  h1 {
+    position: absolute; left: 0; right: 0; top: 64px; margin: 0;
+    font-family: "GFS Didot", serif; font-weight: 400; font-size: 30px; line-height: 1.15;
+    letter-spacing: -0.005em; word-spacing: -0.07em; text-align: center;
+    color: #14202b;
+  }
+  svg { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+  <h1>Drag Kalos into Applications</h1>
+  <svg width="600" height="384" viewBox="0 0 600 384" aria-hidden="true">
+    <g stroke="#14202b" stroke-opacity="0.72" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M236 208 H356"/>
+      <path d="M347 200 L357 208 L347 216"/>
+    </g>
+  </svg>
+</body>
+</html>
