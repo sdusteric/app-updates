@@ -1,6 +1,6 @@
 # app-updates
 
-Shared Sparkle update publishing for the macOS apps (Haul, Tidy, Reel, Snap, Booth and future ones). The fixed rules are in `CONTRACT.md`. This repo holds the publishing scripts, one `appcast.xml` per app, and the vendored Sparkle 2.10.0 tools (`vendor/`, not committed). Archives live in GitHub Releases of this repo. The appcasts are served by GitHub Pages from the root of `main`.
+Shared Sparkle update publishing for the macOS apps (Haul, Tidy, Reel, Snap, Booth and future ones). The folder `kalos-safety-bench/` is separate: the public copy of the Kalos agent safety bench (its README says what it is), made in the Kalos repo with `main.py pack`. The fixed rules are in `CONTRACT.md`. This repo holds the publishing scripts, one `appcast.xml` per app, and the vendored Sparkle 2.10.0 tools (`vendor/`, not committed). Archives live in GitHub Releases of this repo. The appcasts are served by GitHub Pages from the root of `main`.
 
 ## Feed URL
 
