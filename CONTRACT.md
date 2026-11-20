@@ -12,6 +12,16 @@
 - Publishing: `tools/publish.sh --app <app> --bundle <path/App.app> [--notes <file.md>] [--dry-run <dir>] [--channel beta] [--prefix <name>]`. Each app repo has `scripts/release.sh` that runs its check gates, builds the release bundle and calls publish.sh.
 - Beta channel: `--channel beta` marks the new item `<sparkle:channel>beta</sparkle:channel>`. Sparkle offers it only to apps whose updater delegate returns `beta` from `allowedChannels(for:)` (a "Get beta updates" setting, off by default); everyone else skips it and keeps getting the newest item without a channel. One feed per app either way.
 
+## Kalos block lists
+
+Kalos's content blocker lists update between app releases (design: `pane/docs/superpowers/specs/2026-11-12-pane-block-list-updates.md`).
+
+- Where: `https://updates.kalosbrowser.com/kalos/blocklists/v1/`, in the R2 bucket `kalos-updates`. `v1` is the format; a change older apps could not read goes to `v2`.
+- Files: `manifest.json` (`format` 1, `generated` as a UTC time, the chunks with their rule counts and plain SHA-256, and `files`: the SHA-256 and size of every served file), `manifest.json.sig` (one raw 64-byte Ed25519 signature over the manifest's exact bytes per signing key, two while a key is rotated), each chunk as `<chunk>.json.lzfse`, and `cosmetic.json.lzfse` and `scriptlets.json.lzfse` from the same build.
+- Key: an Ed25519 key of its own, not the Sparkle key, in the login Keychain (service `Kalos block lists`, account `kalos-blocklists`), made once with `tools/publish-blocklists.sh --make-key`, which prints only the public key. That goes in `pane/Sources/PaneCore/BlockListKey.swift` (`current`; `next` is the second slot for a rotation). With both empty, Kalos never checks.
+- Publishing: `tools/publish-blocklists.sh` builds the lists with `pane/scripts/make-blocklists.sh` (or takes `--from <folder>`), refuses a build with a list under 80% of the rules it had in the published build, a chunk over 40,000 rules, or a time not newer than the published one, then compresses, writes the manifest, signs it and uploads every file, the signature, and the manifest last, all with `Cache-Control: no-cache`. `--dry-run <dir>` writes everything into an empty `<dir>`, signs with a throwaway key made for that run (its public half in `throwaway-public-key.txt`), never reads the Keychain or the network, and uploads nothing; with no `--previous <manifest.json>` it compares with the lists the app ships. Agents run it only with `--dry-run`.
+- The app: at most once a day, 5 minutes after launch, never with `PANE_NO_UPDATES=1` or `PANE_EPHEMERAL=1`, in Low Power Mode or with blocking off. One conditional GET for the manifest, then only files whose hash changed. The request carries no cookie and no identifier, with the user agent `Kalos`.
+
 ## Shelf (home base for the apps)
 
 Shelf (`shelf`, feed as above) is the menu bar panel for Haul, Tidy, Reel, Snap, Booth and Dolly. Haul is private and has no feed: Shelf shows its local version only and never requests a Haul feed.
