@@ -13,8 +13,9 @@ set -euo pipefail
 R2_BUCKET="kalos-updates"
 R2_PREFIX="kalos/blocklists/v1"
 R2_BASE="${KALOS_UPDATES_BASE:-https://updates.kalosbrowser.com}"
-# The command that talks to R2. Tests put a fake here.
-read -r -a WRANGLER <<<"${PUBLISH_WRANGLER:-pnpm dlx wrangler}"
+# The command that talks to R2. Tests put a fake here. --allow-build names wrangler's two packages with install
+# scripts, so pnpm never stops to ask about them; --silent drops pnpm's "Done in" line after every upload.
+read -r -a WRANGLER <<<"${PUBLISH_WRANGLER:-pnpm --silent dlx --allow-build=esbuild --allow-build=workerd wrangler}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PANE_DIR="$(cd "$SCRIPT_DIR/../../pane" 2>/dev/null && pwd || true)"
